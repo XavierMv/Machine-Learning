@@ -1,0 +1,133 @@
+---
+title: "Hands on Machine Learning"
+author: "Xavier Magaña Vera"
+date: "8/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+pml_training <- read_csv("C:/Users/xavie/OneDrive/Escritorio/data science coursera/pml-training.csv")
+pml_testing <- read_csv("C:/Users/xavie/OneDrive/Escritorio/data science coursera/pml-testing.csv")
+```
+
+As a starting point I downloaded the csv files into the Markdown, I first wrote a FOR loop to see how many missing values I had per column and I realized that there were some columns without missing values, but the ones that had NA´s had almost all of the column with missing values which made it impossible to impute the data.
+
+```{r, results='hide'}
+res <- c()
+for(i in 1:ncol(pml_training)){
+  res <- length(which(is.na(pml_training[[i]])))
+  print(res)
+}
+```
+
+After that was made I created a FOR loop again to convert the "#DIV/=!" values into NA´s so I could know if there were NA´s in the columns where there seemed to been and kept all the columns that had no missing values.
+
+```{r, results='hide'}
+resfin<-c()
+y<-c()  
+for(j in 1:ncol(pml_training)){
+  x=pml_training[[j]]
+  y[j]<-length(x[which(x=="#DIV/0!")])
+  
+}
+z<-c(1:ncol(pml_training))
+y<-cbind(y,z)
+y<-as.data.frame(y)
+div<-which(y$y!=0)
+resfin <- c()
+
+pml_training <- pml_training[-c(div)]
+
+for(i in 1:ncol(pml_training)){
+  resfin[i]<-length(which(is.na(pml_training[[i]])))
+  }
+resfin 
+r<-c(1:ncol(pml_training))
+resfin <- cbind(resfin,r)
+resfin <- as.data.frame(resfin)
+div2 <- which(resfin$resfin!=0)
+pml_training <- pml_training[-c(div2)]
+
+pml_testing <- pml_testing[, colSums(is.na(pml_testing)) < nrow(pml_testing)]
+```
+
+After I eliminated the columns with missing values I split the data into training and testing with 60% of the data in training and 40% in testing.
+
+```{r}
+library(randomForest)
+library(caret)
+pml_training$classe <- as.factor(pml_training$classe)
+set.seed(1996)
+splitindex <- createDataPartition(pml_training$classe, p=.6, list = FALSE)
+tr <- pml_training[splitindex,]
+tst <- pml_training[-splitindex,]
+```
+
+After splitting the data I eliminated the columns that had no covariance and were almost all characters and after that was made I took the correlation of the remaining variables.
+
+```{r}
+nsvtr<-nearZeroVar(tr)
+
+tr <- tr[-c(nsvtr)]
+tst <- tst[-c(nsvtr)]
+pml_testing <- pml_testing[-c(nsvtr)]
+
+cut <- c(1,2,5,6)
+tr <- tr[-c(cut)]
+tst <- tst[-c(cut)]
+pml_testing <- pml_testing[-c(cut)]
+
+
+library(corrplot)
+rho <- cor(tr[,-55])
+val <- abs(rho)
+diag(val) <- 0
+table(which(val>=0.7, arr.ind=TRUE))
+```
+
+Once I knew which were the columns with a correlation bigger or equql to 70%, I eliminate them and just kept the 18 most representative variables.
+
+```{r}
+cor <- c(1,3,4,5,6,7,10,11,12,13,14,15,20,21,23,24,25,26,27,28,29,30,31,32, 33,34,35,36,37,38,39,40,41,47,48,50,53)
+tr <- tr[-c(cor)]
+tst <- tst[-c(cor)]
+pml_testing <- pml_testing[-c(cor)]
+```
+
+After that was done I ran the random forest model with my training data and stored the prediction with my test data.
+
+```{r, warning=FALSE, message=FALSE}
+model <- randomForest(classe~., data = tr)
+print(model)
+pred <- predict(model, newdata = tst, type = "class")
+```
+
+After that I created a confusion matrix to see the accuracy of the model and it got a 95.96% and I decided it was a good model so I kept it.
+
+```{r}
+t <- table(as.factor(tst$classe), pred)
+confusionMatrix(t)
+```
+
+Finally I made the prediction for the pml_testing data which only had 20 observations and obtained the following.
+
+```{r}
+predict(model, pml_testing, type = "class")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
